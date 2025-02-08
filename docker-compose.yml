@@ -1,0 +1,78 @@
+# Docker Compose 버전 지정
+version: "3.8"
+
+services:
+  # PostgreSQL 서비스 정의
+  postgres_second:
+    # 사용할 PostgreSQL 이미지 지정 (Alpine 버전)
+    image: postgres:17.2-alpine
+    # 컨테이너 이름 지정
+    container_name: noin-job
+    # 환경 변수 설정
+    environment:
+      # PostgreSQL 사용자 이름
+      POSTGRES_USER: kyh-postgres
+      # PostgreSQL 비밀번호
+      POSTGRES_PASSWORD: kyh-postgres
+      # 생성할 기본 데이터베이스 이름
+      POSTGRES_DB: kyh_noin_job
+      # 타임존 설정 (일본 시간)
+      TZ: "Asia/Tokyo"
+    # 포트 포워딩 설정 (호스트:컨테이너)
+    # 호스트의 5434 포트를 컨테이너의 5432 포트에 연결
+    ports:
+      - "5434:5432"
+    # 데이터 영구 저장을 위한 볼륨 설정
+    volumes:
+      - kyh-db:/var/lib/postgresql/data
+    # 컨테이너 자동 재시작 설정
+    restart: always
+    # 네트워크 설정
+    networks:
+      - local-network
+    # 데이터베이스 헬스체크 설정
+    healthcheck:
+      # PostgreSQL 서버 상태 확인 명령
+      test: ["CMD-SHELL", "pg_isready -U kyh-postgres -d kyh_noin_job"]
+      # 체크 주기 (10초)
+      interval: 10s
+      # 타임아웃 시간 (5초)
+      timeout: 5s
+      # 재시도 횟수 (5회)
+      retries: 5
+
+  # Minio 서비스 정의
+  minio:
+    image: minio/minio
+    container_name: noin-minio
+    environment:
+      MINIO_ROOT_USER: minio
+      MINIO_ROOT_PASSWORD: minio123
+    command: server /data --console-address ":9001"
+    ports:
+      - "9000:9000" # API 포트
+      - "9001:9001" # Console 포트
+    volumes:
+      - minio-data:/data
+    networks:
+      - local-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+
+# 볼륨 정의
+volumes:
+  # PostgreSQL 데이터를 저장할 볼륨
+  kyh-db:
+    name: kyh-db
+  minio-data:
+    name: minio-data
+
+# 네트워크 정의
+networks:
+  # PostgreSQL 전용 네트워크
+  local-network:
+    name: local-network
+    driver: bridge
